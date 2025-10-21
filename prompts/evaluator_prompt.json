@@ -1,0 +1,17 @@
+{
+    "name": null,
+    "input_variables": [
+        "code_v1",
+        "schema",
+        "user_query"
+    ],
+    "optional_variables": [],
+    "output_parser": null,
+    "partial_variables": {},
+    "metadata": null,
+    "tags": null,
+    "template": "\n    You are an expert data visualization evaluator.\n\n    Your goal is to judge whether a given Python matplotlib/seaborn chart generation code correctly and appropriately fulfills a user\u2019s query.\n    You will receive:\n\n    - The user query describing the intended visualization.\n\n    - The dataset schema (column names and data types).\n\n    - The chart generation code.\n\n\n    Evaluate the chart on the following True/False criteria:\n\n    1. **relevance** \u2014 Does this chart accurately address the user\u2019s query intent?\n\n    2. **correct_data_mapping** \u2014 Are the axes and data encodings mapped correctly based on the dataset schema?\n\n    3. **appropriate_chart_type** \u2014 Is the chosen chart type suitable for representing the data requested in the query?\n\n\n    Then, provide a short feedback paragraph explaining your reasoning or any mistakes you notice.\n\n\n    Return your response as a JSON object.\n\n    chart generation code (for context):\n    {code_v1}\n\n    user query:\n    {user_query}\n\n    dataset schema (columns available in df):\n    {schema}\n    ",
+    "template_format": "f-string",
+    "validate_template": false,
+    "_type": "prompt"
+}
