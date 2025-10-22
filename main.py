@@ -20,9 +20,10 @@ class AnalystState(TypedDict):
     schema: dict
     max_retry: int 
     rubric : Optional[EvaluationCriteria]
-    chart: Optional[str]
+    chart_code: Optional[str]
+    chart_path: Optional[str]
 
-def generate_chart(state:AnalystState) -> dict:
+def generate_chart_code(state:AnalystState) -> dict:
     """Generate/Revise chart code in python based on user query"""
 
     # load csv data as str as LLMs can handle textual descriptions of dicts — and load_prompt will accept them.
@@ -47,10 +48,24 @@ def generate_chart(state:AnalystState) -> dict:
                                  "feedback":feedback,
                                  "out_path_v1":out_path})
     
-    # update max_retry
-    state["max_retry"] -= 1
+    return {"chart_code":chart_code.code,"chart_path":out_path}
+
+def generate_chart(state:AnalystState):
+    """Generate image/PNG from chart code"""
+
+    chart_code = state.get("chart_code")
+
+    if chart_code:
+        # Extract the code within the <execute_python> tags
+        chart_code = extract_python_code(chart_code)
+        # If code runs successfully, the file chart_{max_retry}.png should have been generated
+        exec_globals = {"df":df}
+        exec(chart_code,exec_globals)
     
-    return {"chart":chart_code.code}
+    # update max_retry
+    max_retry = state["max_retry"] - 1
+    return {"max_retry":max_retry}
+
 
 def evaluate_chart(state:AnalystState):
     """Evaluate llm-generated chart code and generate appropriate rubric-aligned feedback"""
@@ -58,7 +73,8 @@ def evaluate_chart(state:AnalystState):
     user_query = state.get("user_query")
     data = str(state.get("data"))
     schema = str(state.get("schema"))
-    chart = state.get("chart")
+    chart_code = state.get("chart_code")
+    chart_image = encode_image_b64(state.get("chart_path")) 
 
     # define evaluator LLM-as-judge to refine generated chart
     evaluator = evaluator_llm.with_structured_output(EvaluationCriteria)
@@ -72,9 +88,11 @@ def evaluate_chart(state:AnalystState):
     response =  chain.invoke({
                             "user_query":user_query,
                             "schema":schema,
-                            "code_v1":chart 
+                            "code_v1":chart_code,
+                            "chart_image":chart_image
                             })
-    
+    print(f"""Trial no.{2-state['max_retry']}""")
+    print(response)
     return {"rubric":response}
     
 def check_condition(state:AnalystState) -> Literal["retry","end"]:
@@ -82,10 +100,10 @@ def check_condition(state:AnalystState) -> Literal["retry","end"]:
 
     max_retry = state.get("max_retry")
     # calculate total passing evaluation criteria based on objective rubric
-    rubric_total = state["rubric"].relevance + state["rubric"].appropriate_chart_type + state["rubric"].correct_data_mapping
+    rubric_total = state["rubric"].has_clarity + state["rubric"].has_axis_labels + state["rubric"].has_clear_title + state["rubric"].has_legend_if_needed + state["rubric"].relevance + state["rubric"].appropriate_chart_type + state["rubric"].correct_data_mapping
 
     # retry the chart generation if all criteria not fulfilled by prev code
-    if max_retry > 0 and rubric_total < 3:
+    if max_retry > 0 and rubric_total < 7:
         return "retry"
     else:
         return "end" 
@@ -94,18 +112,20 @@ def check_condition(state:AnalystState) -> Literal["retry","end"]:
 # create a stategraph with Schema 
 graph = StateGraph(AnalystState)
 # add nodes
+graph.add_node("generate_chart_code",generate_chart_code)
 graph.add_node("generate_chart",generate_chart)
 graph.add_node("evaluate_chart",evaluate_chart)
 # add edges
-graph.add_edge(START,"generate_chart")
+graph.add_edge(START,"generate_chart_code")
+graph.add_edge("generate_chart_code","generate_chart")
 graph.add_edge("generate_chart","evaluate_chart")
-graph.add_conditional_edges("evaluate_chart",check_condition,{"retry":"generate_chart","end":END})
+graph.add_conditional_edges("evaluate_chart",check_condition,{"retry":"generate_chart_code","end":END})
 
 # compile the graph into a agent
 agent = graph.compile()
 
 # define llms for generation and evaluation tasks
-generator_llm = ChatOpenAI(model="gpt-4o-mini")
+generator_llm = ChatOpenAI(model="gpt-4o")
 evaluator_llm = ChatOpenAI(model="gpt-4o")
 
 # load the entire csv data into pandas dataframe
@@ -114,7 +134,7 @@ df,schema = load_csv_data("data/titanic.csv")
 
 # define initial state -- all required fields
 initial_state = {
-                "user_query": "Draw a chart for Survival rate by Passenger class",
+                "user_query": "create a plot to visualize how passenger age relates to survival rate",
                  "data": df.head(5).to_dict(orient="records"), # passing sample only
                  "schema": schema, # passing metadata for deeper understanding to the llm
                  "max_retry": 2
@@ -122,16 +142,13 @@ initial_state = {
 # invoke the agent
 final_state = agent.invoke(initial_state)
 
-# Get the code within the <execute_python> tags
-chart_code = extract_python_code(final_state["chart"])
-# If code runs successfully, the file chart_v2.png should have been generated
-exec_globals = {"df":df}
-exec(chart_code,exec_globals)
+print(final_state)
 
 
 
-
-
-
-
-
+# enhancements
+# 1. create streamlit interface
+# 2. expose as endpoints using fastapi
+# 3. display initial code and chart, all successive charts and rubric
+# 
+#

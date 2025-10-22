@@ -18,7 +18,7 @@ template = """
     Requirements for the code:
     1. Revise and return improved code by incorporating given feedback {feedback} if present.
     2. Assume the DataFrame is already loaded as 'df'.
-    3. Use matplotlib for plotting.
+    3. Use seaborn/matplotlib for plotting.
     4. Add clear title, axis labels, and legend if needed.
     5. Save the figure as '{out_path_v1}' with dpi=300.
     6. Do not call plt.show().
