@@ -2,7 +2,8 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate,load_prompt
 from langchain_core.output_parsers import StrOutputParser,PydanticOutputParser
 from langchain_core.runnables import RunnableSequence
-from langgraph.graph import StateGraph,START,END
+from langgraph.graph import StateGraph,START,END,add_messages
+from langsmith import traceable
 from pydantic import BaseModel,Field
 from typing import Literal,Annotated,Optional,TypedDict
 import pandas as pd
@@ -19,10 +20,11 @@ class AnalystState(TypedDict):
     data: dict
     schema: dict
     max_retry: int 
-    rubric : Optional[EvaluationCriteria]
+    rubric : Annotated[Optional[list[EvaluationCriteria]],add_messages]
     chart_code: Optional[str]
     chart_path: Optional[str]
 
+@traceable(run_type="llm",name="generate chart code",tags=["chart_code","chart_path"])
 def generate_chart_code(state:AnalystState) -> dict:
     """Generate/Revise chart code in python based on user query"""
 
@@ -30,7 +32,7 @@ def generate_chart_code(state:AnalystState) -> dict:
     user_query = state.get("user_query")
     #data = str(state.get("data"))
     schema = str(state.get("schema"))
-    feedback = state["rubric"].feedback if state.get("rubric") else "No feedback yet. This is the first attempt."
+    feedback = state["rubric"][-1].feedback if state.get("rubric") else "No feedback yet. This is the first attempt."
     
     # file path to save generated chart
     out_path = f"charts/chart_{str(state['max_retry'])}.png"
@@ -50,6 +52,7 @@ def generate_chart_code(state:AnalystState) -> dict:
     
     return {"chart_code":chart_code.code,"chart_path":out_path}
 
+@traceable(name="generate_chart",tags=["max_retry"])
 def generate_chart(state:AnalystState):
     """Generate image/PNG from chart code"""
 
@@ -66,7 +69,7 @@ def generate_chart(state:AnalystState):
     max_retry = state["max_retry"] - 1
     return {"max_retry":max_retry}
 
-
+@traceable(run_type="llm",name="evaluate_chart",tags=["rubric"])
 def evaluate_chart(state:AnalystState):
     """Evaluate llm-generated chart code and generate appropriate rubric-aligned feedback"""
 
@@ -91,16 +94,15 @@ def evaluate_chart(state:AnalystState):
                             "code_v1":chart_code,
                             "chart_image":chart_image
                             })
-    print(f"""Trial no.{2-state['max_retry']}""")
-    print(response)
-    return {"rubric":response}
+    return {"rubric":[response]}
     
 def check_condition(state:AnalystState) -> Literal["retry","end"]:
     """Check condition for feedback loop"""
 
     max_retry = state.get("max_retry")
     # calculate total passing evaluation criteria based on objective rubric
-    rubric_total = state["rubric"].has_clarity + state["rubric"].has_axis_labels + state["rubric"].has_clear_title + state["rubric"].has_legend_if_needed + state["rubric"].relevance + state["rubric"].appropriate_chart_type + state["rubric"].correct_data_mapping
+    current_rubric = state["rubric"][-1]
+    rubric_total = current_rubric.has_clarity + current_rubric.has_axis_labels + current_rubric.has_clear_title + current_rubric.has_legend_if_needed + current_rubric.relevance + current_rubric.appropriate_chart_type + current_rubric.correct_data_mapping
 
     # retry the chart generation if all criteria not fulfilled by prev code
     if max_retry > 0 and rubric_total < 7:
@@ -134,15 +136,15 @@ df,schema = load_csv_data("data/titanic.csv")
 
 # define initial state -- all required fields
 initial_state = {
-                "user_query": "create a plot to visualize how passenger age relates to survival rate",
+                "user_query": "Plot the relationship between family size (SibSp + Parch + 1) and survival rate.",
                  "data": df.head(5).to_dict(orient="records"), # passing sample only
                  "schema": schema, # passing metadata for deeper understanding to the llm
-                 "max_retry": 2
+                 "max_retry": 3
                  }
 # invoke the agent
 final_state = agent.invoke(initial_state)
 
-print(final_state)
+#print(final_state)
 
 
 
