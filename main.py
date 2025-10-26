@@ -80,9 +80,8 @@ def generate_chart(state:AnalystState):
                     feedback = "Warning detected: " + "; ".join(str(warn.message) for warn in w)
                     
     rubric = EvaluationCriteria(feedback=feedback,error=error)
-    print(rubric)
     rubric_list = serialize_rubric(rubric,state)
-    print(rubric_list)
+    
     # update max_retry
     max_retry = state["max_retry"] - 1
     return {"max_retry":max_retry,"rubric":rubric_list}
@@ -103,10 +102,13 @@ def evaluate_chart(state:AnalystState):
     # load saved prompt
     prompt = load_prompt("prompts/evaluator_prompt.json")
 
-    # in case of error during last chart generation
+    # in case of error/warning during last chart generation
     rubric_list = state.get("rubric")
     error = state.get("rubric")[-1]["error"] if rubric_list else None
-    if error:
+    feedback = state.get("rubric")[-1]["feedback"] if rubric_list else None
+    warning = "Warning detected:" in feedback if feedback else None
+
+    if error or warning:
         return {"rubric": rubric_list}
     else:
         # define runnable to invoke with inputs
@@ -118,7 +120,7 @@ def evaluate_chart(state:AnalystState):
                                 #"chart_image":chart_image
                                 })
         rubric_list = serialize_rubric(response,state)
-        return {"rubric": rubric_list}
+    return {"rubric": rubric_list}
     
 def check_condition(state:AnalystState) -> Literal["retry","end"]:
     """Check condition for feedback loop"""
