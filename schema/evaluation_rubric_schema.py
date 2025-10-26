@@ -1,15 +1,16 @@
 from pydantic import BaseModel,Field
-from typing import Literal
+from typing import Literal,Optional
 
 #Schema for evaluator llm (LLM-as-judge) for consistent, rubric-aligned, and actionable feedback.
 class EvaluationCriteria(BaseModel):
     """Structured format for evaluating LLM-generated chart code"""
-    relevance: Literal[1,0] = Field(...,description="Does this chart address the user query accurately?")
-    has_clear_title: Literal[1,0] = Field(...,description="Does this chart have clear title?")
-    has_axis_labels: Literal[1,0] = Field(...,description="Does this chart have correct axis labels?")
-    has_legend_if_needed: Literal[1,0] = Field(description="Does this chart have meaningful legend?")
-    correct_data_mapping: Literal[1,0] = Field(...,description="Are the axes and data encodings correct?")
-    appropriate_chart_type: Literal[1,0] = Field(...,description="Is the chart type appropriate for the data and query?")
-    has_clarity: Literal[1,0] = Field(...,description="Is the chart easy to read without ambiguity?")
+    relevance: Literal[1,0] = Field(0,description="Does this chart address the user query accurately?")
+    has_clear_title: Literal[1,0] = Field(0,description="Does this chart have clear title?")
+    has_axis_labels: Literal[1,0] = Field(0,description="Does this chart have correct axis labels?")
+    has_legend_if_needed: Literal[1,0] = Field(0,description="Does this chart have meaningful legend?")
+    correct_data_mapping: Literal[1,0] = Field(0,description="Are the axes and data encodings correct?")
+    appropriate_chart_type: Literal[1,0] = Field(0,description="Is the chart type appropriate for the data and query?")
+    has_clarity: Literal[1,0] = Field(0,description="Is the chart easy to read without ambiguity?")
 
-    feedback: str = Field(...,description="a brief feedback on the chart not exceeding a paragraph")
+    feedback: Optional[str] = Field(None,description="a brief feedback on the chart not exceeding a paragraph")
+    error: Optional[str] = Field(None,description="detailed error description thrown during execution of chart code.")
