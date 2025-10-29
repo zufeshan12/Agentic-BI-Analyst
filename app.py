@@ -1,86 +1,73 @@
-from fastapi import FastAPI, UploadFile, Form,Path
-from fastapi.responses import JSONResponse,FileResponse
+import streamlit as st
+import requests
 import pandas as pd
-import io
-import os
-from typing import Optional
-from main import run_workflow 
-from schema.analyst_state_schema import AnalystState
-from schema.evaluation_rubric_schema import EvaluationCriteria
-from utils import *    
+from io import BytesIO
+from PIL import Image
+from utils import clear_charts
 
-app = FastAPI(title="Agentic BI Analyst API")
 
-@app.get("/")
-def welcome():
-    return {"message":"Hello! Welcome to Agentic BI Analyst"}
+FASTAPI_URL = "http://localhost:8000/analyze"
+CHARTS_URL = "http://localhost:8000/"
 
-@app.get("/health")
-def healthcheck():
-    return {"status": "OK",
-            "version": "1.0"
-            }
+st.set_page_config(page_title="Agentic BI Analyst", layout="wide")
+st.title("📊 Agentic BI Analyst Demo")
 
-@app.post("/analyze",response_model=EvaluationCriteria)
-async def analyze(
-    file: UploadFile,
-    user_query: str = Form(...),
-    max_retry: Optional[int] = Form(3)
-):
-    """
-    Upload a CSV, specify a text query and max retry limit.
-    Returns the generated charts and rubric feedback.
-    """
-    try:
-        # Load CSV into pandas DataFrame
-        contents = await file.read()
-        
-        # Extract schema and convert df to dict for LLM consumption
-        df,schema = load_csv_data(io.BytesIO(contents)) 
-        data = df.head(5).to_dict(orient="records")
+# --- Sidebar / Controls ---
+st.sidebar.header("⚙️ Controls")
+clear = st.sidebar.button("🧹 Clear Output")
 
-        # Define initial state
-        initial_state: AnalystState = {
-            "user_query": user_query,
-            "data": data,
-            "schema": schema,
-            "max_retry": max_retry,
-            "rubric": None,
-            "chart_code": None,
-            "chart_path": None,
-        }
-
-        # Run the LangGraph workflow
-        final_state = run_workflow(initial_state)
-
-        # Serialize rubric for readability (convert Pydantic -> dict)
-        #rubric_list = serialize_rubric(final_state.get("rubric"), final_state)
-        #print(rubric_list)
-
-        # Prepare response
-        response = {
-            "query": user_query,
-            "charts": final_state.get("chart_path"),
-            "rubric_feedback": final_state.get("rubric")
-        }
-
-        return JSONResponse(status_code=200,content={'response':response})
-
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
-
-@app.get("/charts/{chart_path}")
-def display_chart(chart_path:str = Path(...,description="Name of the chart file",example="chart_v0.png")):
-    """Display chart as image if present"""
-
-    file_path = os.path.join("charts",chart_path)
-    # check if file exists
-    if os.path.exists(file_path):
-        # display chart
-        return FileResponse(path=file_path,media_type="image/png")
-    else:
-        return JSONResponse(status_code=404,content={"error":"Chart not found."})
+if clear:
+    st.session_state.clear()
     
+# --- Upload + Inputs ---
+uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
+user_query = st.text_area("Describe the visualization you want:", height=50)
+max_retry = st.number_input("Max retries", min_value=1, max_value=5, value=3)
+
+if st.button("Generate Charts"):
+    # clear the Charts folder
+    clear_charts()
+
+    if uploaded_file and user_query.strip():
+        files = {"file": uploaded_file.getvalue()}
+        data = {"user_query": user_query, "max_retry": str(max_retry)}
+
+        with st.spinner("⏳ Running your agentic workflow..."):
+            response = requests.post(FASTAPI_URL, files=files, data=data)
+
+        if response.status_code == 200:
+            result = response.json()['response']
+            charts = result.get("charts", [])
+            rubrics = result.get("rubric_feedback", [])
+
+            if not charts:
+                st.error("No charts were generated.")
+            else:
+                st.success(f"✅ Generated {len(charts)} chart versions")
+
+                for i, (chart_path, rubric) in enumerate(zip(charts, rubrics)):
+                    st.markdown(f"### 🧩 Iteration {i+1}")
+                    cols = st.columns([2, 3])
+
+                    # --- Display Chart ---
+                    with cols[0]:
+                        chart_url = f"{CHARTS_URL}/{chart_path}"
+                        img_response = requests.get(chart_url)
+                        if img_response.status_code == 200:
+                            image = Image.open(BytesIO(img_response.content))
+                            st.image(image, caption=chart_path, use_container_width=True)
+                        else:
+                            st.warning(f"Chart not found at: {chart_url}")
+
+                    # --- Display Rubric ---
+                    with cols[1]:
+                        st.markdown("**Rubric Feedback**")
+                        if rubric:
+                            df = pd.DataFrame(list(rubric.items()), columns=["Criteria", "Score"])
+                            st.dataframe(df, use_container_width=True)
+                        else:
+                            st.info("No rubric feedback available for this iteration.")
+        else:
+            st.error(f"❌ Request failed: {response.text}")
+    else:
+        st.warning("Please upload a CSV and enter a valid query.")

@@ -5,6 +5,7 @@ from io import BytesIO
 from schema.analyst_state_schema import AnalystState
 from schema.evaluation_rubric_schema import EvaluationCriteria
 import re
+import os
 
 def load_csv_data(file_path):
     """load csv into pandas Dataframe and return df with schema"""
@@ -42,3 +43,14 @@ def serialize_rubric(response:EvaluationCriteria,state:AnalystState) -> list[dic
     state["rubric"] = rubric_list
 
     return rubric_list
+
+def clear_charts():
+    """Empty the Charts folder before new request"""
+    dir_path = "charts"
+    if os.path.exists(dir_path):
+        for file in os.listdir(dir_path):
+            
+            file_path = os.path.join(dir_path,file)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+    
