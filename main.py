@@ -1,12 +1,13 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate,load_prompt
-from langchain_core.output_parsers import StrOutputParser,PydanticOutputParser
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableSequence
-from langgraph.graph import StateGraph,START,END,add_messages
+from langgraph.graph import StateGraph,START,END
 from langsmith import traceable
 from pydantic import BaseModel,Field
 from typing import Literal,Annotated,Optional,TypedDict
 import pandas as pd
+from schema.analyst_state_schema import AnalystState
 from schema.chart_code_schema import ChartCode
 from schema.evaluation_rubric_schema import EvaluationCriteria
 import warnings
@@ -16,16 +17,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# create analyst state schema
-class AnalystState(TypedDict):
-    user_query : str
-    data: dict
-    schema: dict
-    max_retry: int 
-    rubric : Optional[list[dict[str,any]]]
-    chart_code: Optional[str]
-    chart_path: Optional[str]
-
 @traceable(run_type="llm",name="generate chart code",tags=["chart_code","chart_path"])
 def generate_chart_code(state:AnalystState) -> dict:
     """Generate/Revise chart code in python based on user query"""
@@ -34,10 +25,18 @@ def generate_chart_code(state:AnalystState) -> dict:
     user_query = state.get("user_query")
     #data = str(state.get("data"))
     schema = str(state.get("schema"))
-    feedback = state["rubric"][-1]['feedback'] if state.get("rubric") else "No feedback yet. This is the first attempt."
-    
+    rubric_list = state.get("rubric")
+    #feedback = state["rubric"][-1]['feedback'] if state.get("rubric") else "No feedback yet. This is the first attempt."
+    if rubric_list:
+        feedback = [rubric['feedback'] for rubric in rubric_list]
+    else:
+        feedback = "No feedback yet. This is the first attempt."
+
     # file path to save generated chart
-    out_path = f"charts/chart_{str(state['max_retry'])}.png"
+    charts = state.get("chart_path") if state.get("chart_path") else []
+    out_path = f"charts/chart_v{str(len(charts))}.png"
+    charts.append(out_path)
+    state["chart_path"] = charts
 
     # define generator llm enforcing schema
     generator = generator_llm.with_structured_output(ChartCode)
@@ -52,11 +51,11 @@ def generate_chart_code(state:AnalystState) -> dict:
                                  "feedback":feedback,
                                  "out_path_v1":out_path})
     
-    return {"chart_code":chart_code.code,"chart_path":out_path}
+    return {"chart_code":chart_code.code,"chart_path":state["chart_path"]}
 
 @traceable(name="generate_chart",tags=["max_retry","rubric"])
 def generate_chart(state:AnalystState):
-    """Generate image/PNG from chart code"""
+    """Generate and save image/PNG from chart code"""
 
     chart_code = state.get("chart_code")
     rubric_list = state.get("rubric")
@@ -78,13 +77,17 @@ def generate_chart(state:AnalystState):
             else:
                 if w:
                     feedback = "Warning detected: " + "; ".join(str(warn.message) for warn in w)
-                    
-    rubric = EvaluationCriteria(feedback=feedback,error=error)
-    rubric_list = serialize_rubric(rubric,state)
-    
+
     # update max_retry
     max_retry = state["max_retry"] - 1
-    return {"max_retry":max_retry,"rubric":rubric_list}
+    
+    # in case of error or warning during execution of chart code, create new rubric
+    if error or feedback:               
+        rubric = EvaluationCriteria(feedback=feedback,error=error)
+        rubric_list = serialize_rubric(rubric,state)
+        return {"max_retry":max_retry,"rubric":rubric_list}
+
+    return {"max_retry":max_retry}
 
 @traceable(run_type="llm",name="evaluate_chart",tags=["rubric"])
 def evaluate_chart(state:AnalystState):
@@ -94,7 +97,7 @@ def evaluate_chart(state:AnalystState):
     data = str(state.get("data"))
     schema = str(state.get("schema"))
     chart_code = state.get("chart_code")
-    chart_image = encode_image_b64(state.get("chart_path"))
+    #chart_image = encode_image_b64(state.get("chart_path")[-1])
     
     # define evaluator LLM-as-judge to refine generated chart
     evaluator = evaluator_llm.with_structured_output(EvaluationCriteria)
@@ -108,10 +111,8 @@ def evaluate_chart(state:AnalystState):
     feedback = state.get("rubric")[-1]["feedback"] if rubric_list else None
     warning = "Warning detected:" in feedback if feedback else None
 
-    if error or warning:
-        return {"rubric": rubric_list}
-    else:
-        # define runnable to invoke with inputs
+    if not error:
+       # define runnable to invoke with inputs
         chain = RunnableSequence(prompt,evaluator)
         response =  chain.invoke({
                                 "user_query":user_query,
@@ -120,10 +121,12 @@ def evaluate_chart(state:AnalystState):
                                 #"chart_image":chart_image
                                 })
         rubric_list = serialize_rubric(response,state)
+    
     return {"rubric": rubric_list}
     
 def check_condition(state:AnalystState) -> Literal["retry","end"]:
     """Check condition for feedback loop"""
+
     max_retry = state.get("max_retry")
     # calculate total passing evaluation criteria based on objective rubric
     serialized_rubric = state.get("rubric")[-1]
@@ -137,22 +140,9 @@ def check_condition(state:AnalystState) -> Literal["retry","end"]:
     else:
         return "end" 
 
-def serialize_rubric(response:EvaluationCriteria,state:AnalystState) -> list[dict]:
-    """Convert rubric from pydantic object to a serializable object like json or dict"""
-    if hasattr(response,"model_dump"):
-        serialized = response.model_dump()
-    elif hasattr(response,"dict"):
-        serialized = response.dict()
-    else:
-        serialized = response
-    
-    rubric_list = state.get("rubric") or []
-    rubric_list.append(serialized)
-    state["rubric"] = rubric_list
-
-    return rubric_list
 #------------------------------------------Graph creation and invocation-------------------------------#
 def create_agent():
+    """Create langgraph StateGraph with nodes and edges"""
     # create a stategraph with Schema 
     graph = StateGraph(AnalystState)
     # add nodes
@@ -172,6 +162,7 @@ def create_agent():
 
 @traceable(name="run_workflow",tags=["agent","final_state"])
 def run_workflow(initial_state:AnalystState) -> AnalystState:
+    """Invoke langgraph agent,return final state"""
     
     # create reflective agent
     agent = create_agent()
