@@ -17,6 +17,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# define llms for generation and evaluation tasks
+generator_llm = ChatOpenAI(model="gpt-4o")
+evaluator_llm = ChatOpenAI(model="gpt-4o")
+
 @traceable(run_type="llm",name="generate chart code",tags=["chart_code","chart_path"])
 def generate_chart_code(state:AnalystState) -> dict:
     """Generate/Revise chart code in python based on user query"""
@@ -58,6 +62,7 @@ def generate_chart(state:AnalystState):
     """Generate and save image/PNG from chart code"""
 
     chart_code = state.get("chart_code")
+    df = pd.DataFrame(state["data"]) #reconstruct dataframe
     rubric_list = state.get("rubric")
     feedback = None
     error = None
@@ -170,14 +175,11 @@ def run_workflow(initial_state:AnalystState) -> AnalystState:
     final_state = agent.invoke(initial_state)
     return final_state
 
+"""
 # load the entire csv data into pandas dataframe
 # also get the columns with their dtypes as schema of the given data
 data_path = "data/titanic.csv"
 df,schema = load_csv_data(data_path) 
-
-# define llms for generation and evaluation tasks
-generator_llm = ChatOpenAI(model="gpt-4o")
-evaluator_llm = ChatOpenAI(model="gpt-4o")
 
 # define initial state -- all required fields
 initial_state = {
@@ -189,7 +191,7 @@ initial_state = {
 # run the entire workflow
 final_state = run_workflow(initial_state)
 
-
+"""
 
 
 # enhancements

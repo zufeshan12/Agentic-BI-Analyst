@@ -13,8 +13,20 @@ st.set_page_config(page_title="Agentic BI Analyst", layout="wide")
 st.title("📊 Agentic BI Analyst Demo")
 
 # --- Sidebar / Controls ---
-st.sidebar.header("⚙️ Controls")
-clear = st.sidebar.button("🧹 Clear Output")
+st.sidebar.header("Controls")
+clear = st.sidebar.button("Clear Output",width = "stretch",type="secondary")
+
+# Initialize session state for storing recent queries
+if "recent_queries" not in st.session_state:
+    st.session_state["recent_queries"] = []
+
+# Sidebar — display last 5 queries
+st.sidebar.header("Recent Queries")
+if st.session_state["recent_queries"]:
+    for i, q in enumerate(reversed(st.session_state["recent_queries"]), 1):
+        st.sidebar.markdown(f"**{i}.** {q}")
+else:
+    st.sidebar.info("No recent queries yet.")
 
 if clear:
     st.session_state.clear()
@@ -24,10 +36,11 @@ uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
 user_query = st.text_area("Describe the visualization you want:", height=50)
 max_retry = st.number_input("Max retries", min_value=1, max_value=5, value=3)
 
-if st.button("Generate Charts"):
+if st.button("Generate Charts",width="stretch",type="primary"):
     # clear the Charts folder
     clear_charts()
-
+    
+    # check for required inputs from user
     if uploaded_file and user_query.strip():
         files = {"file": uploaded_file.getvalue()}
         data = {"user_query": user_query, "max_retry": str(max_retry)}
@@ -39,6 +52,10 @@ if st.button("Generate Charts"):
             result = response.json()['response']
             charts = result.get("charts", [])
             rubrics = result.get("rubric_feedback", [])
+
+            # append user query to the session state
+            st.session_state["recent_queries"].append(user_query)
+            st.session_state["recent_queries"] = st.session_state["recent_queries"][-5:]
 
             if not charts:
                 st.error("No charts were generated.")
@@ -71,3 +88,14 @@ if st.button("Generate Charts"):
             st.error(f"❌ Request failed: {response.text}")
     else:
         st.warning("Please upload a CSV and enter a valid query.")
+
+# Footer / Citation
+st.markdown(
+    """
+    <hr style="margin-top: 200px; margin-bottom: 10px; border: 1px solid gray;">
+    <p style='text-align: center; color: gray; font-size: 1.0em;'>
+        Crafted with ❤️ by Zufeshan Imran · © 2025
+    </p>
+    """,
+    unsafe_allow_html=True
+)

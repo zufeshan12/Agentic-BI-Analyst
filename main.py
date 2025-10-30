@@ -37,7 +37,8 @@ async def analyze(
         
         # Extract schema and convert df to dict for LLM consumption
         df,schema = load_csv_data(io.BytesIO(contents)) 
-        data = df.head(5).to_dict(orient="records")
+        #data = df.head(5).to_dict(orient="records")
+        data = df.to_dict(orient="records")
 
         # Define initial state
         initial_state: AnalystState = {
