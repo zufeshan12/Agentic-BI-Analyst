@@ -1,17 +1,17 @@
-##Self-Evaluating Data Visualization Agent
+## Self-Evaluating Data Viz Agent
 A reflective, feedback-driven analytics system that generates and evaluates data visualizations through an autonomous reasoning loop. Built on a reflective design pattern, the system continuously improves its output using external evaluators grounded in objective, multimodal feedback criteria.
 
-##Key Features
+## Key Features
 
-✅ Reflective Agentic Loop – Self-improving code generation based on evaluator feedback
-✅ Objective Rubric Evaluation – Quantitative scoring for every chart iteration
-✅ Multimodal Evaluation – Evaluates both generated code and chart image
-✅ LangGraph State Management – Tracks state transitions across reflection cycles
-✅ Sequential Feedback History – Keeps full rubric log from all retries
-✅ FastAPI Backend + Streamlit UI – Lightweight, production-ready setup
-✅ Chart Caching & Cleanup – Serve generated charts dynamically and clear with one endpoint
+✅ Reflective Agentic Loop – Self-improving code generation based on evaluator feedback<br>
+✅ Objective Rubric Evaluation – Quantitative scoring for every chart iteration<br>
+✅ Multimodal Evaluation – Evaluates both generated code and chart image<br>
+✅ LangGraph State Management – Tracks state transitions across reflection cycles<br>
+✅ Sequential Feedback History – Keeps full rubric log from all retries<br>
+✅ FastAPI Backend + Streamlit UI – Lightweight, production-ready setup<br>
+✅ Chart Caching & Cleanup – Serve generated charts dynamically and clear with one endpoint<br>
 
-##Tech Stack
+## Tech Stack
 
 | Layer                      | Technology                            |
 | :------------------------- | :------------------------------------ |
@@ -23,6 +23,9 @@ A reflective, feedback-driven analytics system that generates and evaluates data
 | **Data Processing**        | Pandas                                |
 | **Package & Env Manager**  | [uv](https://github.com/astral-sh/uv) |
 | **Runtime**                | Python ≥ 3.10                         |
+
+## Demo 
+
 
 ## 🚀 Getting Started
 
@@ -55,4 +58,8 @@ uvicorn main:app --reload
 
 # 6️⃣ In another terminal, run the Streamlit frontend
 streamlit run app.py
+
+
+------------------------------------------------------------
+
 
