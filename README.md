@@ -24,7 +24,47 @@ A reflective, feedback-driven analytics system that generates and evaluates data
 | **Package & Env Manager**  | [uv](https://github.com/astral-sh/uv) |
 | **Runtime**                | Python ≥ 3.10                         |
 
-## Demo 
+## 🎥 Demo
+
+The **Agentic BI Analyst** combines LLM reasoning with visual analytics — turning natural language queries into polished visualizations and self-improving feedback loops.  
+Below are some screenshots showcasing the workflow and UI in action.
+
+### 🧠 1. Upload & Query
+Users can upload a CSV dataset, type a natural language query (e.g., *“Show survival rate by passenger class”*), and choose the retry limit.
+
+![Upload CSV and Query Example](assets/pic1.png)
+
+---
+
+### 📊 2. Generated Charts
+The **Analyst LLM Agent** generates valid Python code for plotting, executes it safely, and saves the charts.  
+Each iteration refines the visualization based on evaluator feedback.
+
+![Generated Chart](assets/pic3.png)
+
+---
+
+### 📈 3. Evaluator Feedback (Rubric)
+The **Evaluator Agent** reviews the generated chart using objective, rubric-based criteria —  
+assessing accuracy, clarity, chart type, data mapping, and more.
+
+![Rubric Feedback Table](assets/pic2.png)
+
+---
+
+### 🔁 4. Iterative Refinement
+If the chart does not meet quality standards, feedback is looped back to the generator,  
+leading to successive improvements — demonstrating a **reflective design pattern**.
+
+![Feedback Loop Visualization](assets/agent_workflow_mermaid.png)
+
+---
+
+### 💡 5. Chart Browser & History
+The Streamlit UI displays all generated charts and feedback summaries in one place.  
+You can browse, compare, and analyze all iterations interactively.
+
+![All Charts and Rubric Table](assets/demo_all_charts_table.png)
 
 
 ## 🚀 Getting Started
@@ -61,5 +101,6 @@ streamlit run app.py
 
 
 ------------------------------------------------------------
+
 
 
