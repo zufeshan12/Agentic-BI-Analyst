@@ -60,13 +60,6 @@ leading to successive improvements — demonstrating a **reflective design patte
 
 ---
 
-### 💡 5. Chart Browser & History
-The Streamlit UI displays all generated charts and feedback summaries in one place.  
-You can browse, compare, and analyze all iterations interactively.
-
-![All Charts and Rubric Table](assets/demo_all_charts_table.png)
-
-
 ## 🚀 Getting Started
 
 Follow these steps to set up and run the application locally.
@@ -101,6 +94,7 @@ streamlit run app.py
 
 
 ------------------------------------------------------------
+
 
 
 
