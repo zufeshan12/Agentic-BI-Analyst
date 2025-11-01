@@ -87,10 +87,10 @@ LANGSMITH_PROJECT="BI Analyst"
 LANGCHAIN_TRACING_V2=true
 
 # 5️⃣ Start the FastAPI backend
-uvicorn main:app --reload
+uvicorn backend.main:app --reload
 
 # 6️⃣ In another terminal, run the Streamlit frontend
-streamlit run app.py
+streamlit run frontend/app.py
 
 
 ------------------------------------------------------------
