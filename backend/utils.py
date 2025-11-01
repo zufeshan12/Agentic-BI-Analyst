@@ -2,8 +2,8 @@ import pandas as pd
 import base64
 from PIL import Image
 from io import BytesIO
-from schema.analyst_state_schema import AnalystState
-from schema.evaluation_rubric_schema import EvaluationCriteria
+from backend.schema.analyst_state_schema import AnalystState
+from backend.schema.evaluation_rubric_schema import EvaluationCriteria
 import re
 import os
 
@@ -21,12 +21,16 @@ def extract_python_code(code_string:str) -> str:
     
 def encode_image_b64(path: str) -> str:
     """Return base64_str for an image file path."""
-    img = Image.open(path)
-    img = img.convert("RGB")
-    img.thumbnail((512, 512))  # resize to manageable dimensions
-    buf = BytesIO()
-    img.save(buf, format="JPEG", quality=85)
-    return base64.b64encode(buf.getvalue()).decode("utf-8")
+    # check if image exists charts/chart_v1.png
+    if os.path.exists(path):
+        img = Image.open(path)
+        img = img.convert("RGB")
+        img.thumbnail((512, 512))  # resize to manageable dimensions
+        buf = BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        return base64.b64encode(buf.getvalue()).decode("utf-8")
+    else:
+        return None
 
 def serialize_rubric(response:EvaluationCriteria,state:AnalystState) -> list[dict]:
     """Convert rubric from pydantic object to a serializable object like json or dict"""
@@ -49,8 +53,10 @@ def clear_charts():
     dir_path = "charts"
     if os.path.exists(dir_path):
         for file in os.listdir(dir_path):
-            
             file_path = os.path.join(dir_path,file)
             if os.path.isfile(file_path):
                 os.remove(file_path)
+        return {"status_code":200,"message":"All charts deleted successfully."}
+    else:
+        return {"status_code":404,"message":"Path does not exist"}
     

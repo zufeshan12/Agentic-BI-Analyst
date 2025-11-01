@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  backend:
+    build: 
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: bi-backend
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/charts:/app/charts
+    networks:
+      - bi-net
+
+  frontend:
+    build: 
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: bi-frontend
+    env_file: .env
+    ports:
+      - "8501:8501"
+    environment:
+      BACKEND_URL: "http://backend:8000"
+    depends_on:
+      - backend
+    networks:
+      - bi-net
+
+networks:
+  bi-net:
+    driver: bridge

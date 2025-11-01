@@ -31,4 +31,4 @@ template = """
 prompt = PromptTemplate(template=template,
                         input_variables=["user_query","schema","feedback","out_path_v1"])
 
-prompt.save("prompts/generator_prompt.json")
+prompt.save("backend/prompts/generator_prompt.json")

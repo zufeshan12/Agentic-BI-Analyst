@@ -7,12 +7,12 @@ from langsmith import traceable
 from pydantic import BaseModel,Field
 from typing import Literal,Annotated,Optional,TypedDict
 import pandas as pd
-from schema.analyst_state_schema import AnalystState
-from schema.chart_code_schema import ChartCode
-from schema.evaluation_rubric_schema import EvaluationCriteria
+from backend.schema.analyst_state_schema import AnalystState
+from backend.schema.chart_code_schema import ChartCode
+from backend.schema.evaluation_rubric_schema import EvaluationCriteria
 import warnings
 from io import StringIO
-from utils import *
+from backend.utils import *
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -46,7 +46,7 @@ def generate_chart_code(state:AnalystState) -> dict:
     generator = generator_llm.with_structured_output(ChartCode)
 
     if user_query:
-        prompt = load_prompt(path="prompts/generator_prompt.json") # load saved prompt
+        prompt = load_prompt(path="backend/prompts/generator_prompt.json") # load saved prompt
         # create a runnable to invoke 
         chain = RunnableSequence(prompt,generator)
         # invoke chain : prompt -> model -> response
@@ -102,13 +102,13 @@ def evaluate_chart(state:AnalystState):
     data = str(state.get("data"))
     schema = str(state.get("schema"))
     chart_code = state.get("chart_code")
-    #chart_image = encode_image_b64(state.get("chart_path")[-1])
+    chart_image = encode_image_b64(state.get("chart_path")[-1])
     
     # define evaluator LLM-as-judge to refine generated chart
     evaluator = evaluator_llm.with_structured_output(EvaluationCriteria)
     
     # load saved prompt
-    prompt = load_prompt("prompts/evaluator_prompt.json")
+    prompt = load_prompt("backend/prompts/evaluator_prompt.json")
 
     # in case of error/warning during last chart generation
     rubric_list = state.get("rubric")
@@ -122,8 +122,8 @@ def evaluate_chart(state:AnalystState):
         response =  chain.invoke({
                                 "user_query":user_query,
                                 "schema":schema,
-                                "code_v1":chart_code #,
-                                #"chart_image":chart_image
+                                "code_v1":chart_code ,
+                                "chart_image":chart_image
                                 })
         rubric_list = serialize_rubric(response,state)
     
@@ -140,7 +140,8 @@ def check_condition(state:AnalystState) -> Literal["retry","end"]:
     rubric_total = current_rubric.has_clarity + current_rubric.has_axis_labels + current_rubric.has_clear_title + current_rubric.has_legend_if_needed + current_rubric.relevance + current_rubric.appropriate_chart_type + current_rubric.correct_data_mapping
 
     # retry the chart generation if all criteria not fulfilled by prev code or code has error
-    if current_rubric.error or (max_retry > 0 and rubric_total < 7):
+    # given the cap of max retry
+    if max_retry > 0 and (current_rubric.error or rubric_total < 7):
         return "retry"
     else:
         return "end" 

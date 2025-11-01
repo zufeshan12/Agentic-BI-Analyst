@@ -35,4 +35,4 @@ template = """
 prompt = PromptTemplate(template=template,
                         input_variables=["code_v1","chart_image","user_query","schema"])
 
-prompt.save("prompts/evaluator_prompt.json")
+prompt.save("backend/prompts/evaluator_prompt.json")

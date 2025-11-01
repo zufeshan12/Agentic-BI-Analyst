@@ -3,11 +3,22 @@ import requests
 import pandas as pd
 from io import BytesIO
 from PIL import Image
-from utils import clear_charts
+import os
 
 
-FASTAPI_URL = "http://localhost:8000/analyze"
-CHARTS_URL = "http://localhost:8000/"
+BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8000")
+CLEAR_CHARTS_URL = f"{BACKEND_URL}/charts/delete"
+
+def clear_charts():
+    """Hit delete api endpoint to delete existing charts"""
+    try:
+        response = requests.delete(CLEAR_CHARTS_URL)
+        if response.status_code == 200:
+            st.success("Existing charts cleared successfully.")
+        else:
+            st.error("Failed to clear existing charts")
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error: {str(e)}")
 
 st.set_page_config(page_title="Agentic BI Analyst", layout="wide")
 st.title("📊 Agentic BI Analyst Demo")
@@ -46,6 +57,7 @@ if st.button("Generate Charts",width="stretch",type="primary"):
         data = {"user_query": user_query, "max_retry": str(max_retry)}
 
         with st.spinner("⏳ Running your agentic workflow..."):
+            FASTAPI_URL = f"{BACKEND_URL}/analyze"
             response = requests.post(FASTAPI_URL, files=files, data=data)
 
         if response.status_code == 200:
@@ -68,7 +80,7 @@ if st.button("Generate Charts",width="stretch",type="primary"):
 
                     # --- Display Chart ---
                     with cols[0]:
-                        chart_url = f"{CHARTS_URL}/{chart_path}"
+                        chart_url = f"{BACKEND_URL}/{chart_path}"
                         img_response = requests.get(chart_url)
                         if img_response.status_code == 200:
                             image = Image.open(BytesIO(img_response.content))

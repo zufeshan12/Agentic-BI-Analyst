@@ -4,10 +4,10 @@ import pandas as pd
 import io
 import os
 from typing import Optional
-from agent_backend import run_workflow 
-from schema.analyst_state_schema import AnalystState
-from schema.evaluation_rubric_schema import EvaluationCriteria
-from utils import *    
+from backend.agent_backend import run_workflow 
+from backend.schema.analyst_state_schema import AnalystState
+from backend.schema.evaluation_rubric_schema import EvaluationCriteria
+from backend.utils import *    
 
 app = FastAPI(title="Agentic BI Analyst API")
 
@@ -85,4 +85,10 @@ def display_chart(chart_path:str = Path(...,description="Name of the chart file"
     else:
         return JSONResponse(status_code=404,content={"error":"Chart not found."})
     
-#@app.delete("/charts/delete")
+@app.delete("/charts/delete")
+def delete():
+    msg = clear_charts()
+    if msg["status_code"] == 200:
+        return JSONResponse(status_code=200,content={"message":"Charts deleted successfully"})
+    
+    return JSONResponse(status_code=404,content={"error":"Path not found"})
